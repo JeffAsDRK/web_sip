@@ -1,0 +1,11 @@
+
+services:
+
+  web:
+    build: ./web
+    container_name: sip-web
+    ports:
+      - "8080:80"           # Interfaz web por HTTP (solo funciona en localhost)
+      - "8443:443"          # Interfaz web por HTTPS (necesaria desde otra red/PC)
+    restart: unless-stopped
+

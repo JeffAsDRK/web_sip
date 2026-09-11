@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Softphone Web SIP</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="phone">
+    <h1>Softphone Web (SIP / WebRTC)</h1>
+
+    <section class="config" id="configSection">
+      <h2>Conexion</h2>
+      <label>WebSocket de Asterisk
+        <input type="text" id="wsUrl" value="wss://CAMBIAR-POR-IP-DE-TU-PBX:8089/ws">
+      </label>
+      <label>Dominio / Realm SIP
+        <input type="text" id="sipDomain" value="localhost">
+      </label>
+      <label>Extension (usuario)
+        <input type="text" id="sipUser" value="1000">
+      </label>
+      <label>Password
+        <input type="password" id="sipPass" value="1000pass">
+      </label>
+      <button id="registerBtn">Registrar</button>
+      <span id="regStatus" class="status offline">Desconectado</span>
+    </section>
+
+    <section class="dialer">
+      <h2>Llamada</h2>
+      <input type="text" id="destination" placeholder="Ej: 1001 o 600 (eco)">
+      <div class="buttons">
+        <button id="callBtn">Llamar</button>
+        <button id="hangupBtn" disabled>Colgar</button>
+      </div>
+      <div class="buttons">
+        <button id="muteBtn" disabled>Silenciar</button>
+      </div>
+    </section>
+
+    <section class="log">
+      <h2>Registro de eventos</h2>
+      <div id="logBox"></div>
+    </section>
+
+    <audio id="remoteAudio" autoplay></audio>
+  </div>
+
+  <script src="vendor/jssip.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
