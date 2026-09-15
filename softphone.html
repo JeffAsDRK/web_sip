@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Softphone JsSIP — Llamadas + Audio bidireccional</title>
+<script src="./jssip-3.10.1.min.js"></script>
+<style>
+  :root{
+    --bg-0:#0a0d12; --bg-1:#11151d; --bg-2:#161b25; --line:#242b38;
+    --fg-0:#eef1f6; --fg-1:#c2c8d6; --fg-2:#8f9dbe; --fg-3:#66708a;
+    --accent:#f5a524; --accent-dark:#c9860f;
+    --ok:#5bd28a; --warn:#f5a524; --err:#ff7a82;
+    --radius:12px; --mono:"SFMono-Regular",Consolas,Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg-0);color:var(--fg-0);font-family:var(--sans);min-height:100vh;
+       display:flex;align-items:flex-start;justify-content:center;padding:2.5rem 1rem}
+  .wrap{width:100%;max-width:420px}
+  h1{font-size:1.3rem;margin:0 0 .2rem;letter-spacing:-.01em}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--fg-3);font-size:.8rem;margin:0 0 1.4rem}
+  .card{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--radius);padding:1.2rem;margin-bottom:1rem}
+  label{display:block;font-family:var(--mono);font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;
+        color:var(--fg-3);margin:.6rem 0 .25rem}
+  label:first-child{margin-top:0}
+  input{width:100%;background:var(--bg-2);border:1px solid var(--line);color:var(--fg-0);padding:.55rem .7rem;
+        border-radius:8px;font-family:var(--mono);font-size:.88rem}
+  input:focus{outline:none;border-color:var(--accent)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+  .btn{background:var(--accent);color:#0a0d12;border:0;padding:.6rem 1.1rem;border-radius:8px;
+       font-weight:700;font-size:.86rem;cursor:pointer;width:100%;margin-top:.9rem}
+  .btn:disabled{opacity:.35;cursor:not-allowed}
+  .btn.ghost{background:transparent;color:var(--fg-0);border:1px solid var(--line)}
+  .btn.danger{background:var(--err);color:#2a0000}
+  .status{display:flex;align-items:center;gap:.55rem;font-family:var(--mono);font-size:.82rem;color:var(--fg-1);margin-top:.9rem}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--fg-3);flex:0 0 auto}
+  .dot.connecting{background:var(--warn);animation:pulse 1.1s infinite}
+  .dot.registered{background:var(--ok)}
+  .dot.calling{background:var(--ok);animation:pulse 1.1s infinite}
+  .dot.failed{background:var(--err)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  #phone-card{display:none}
+  .screen{background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:.7rem .9rem;
+          display:flex;align-items:center;gap:.5rem;margin-bottom:.9rem}
+  .screen input{flex:1;background:transparent;border:0;padding:0;font-size:1.15rem}
+  .clearbtn{background:transparent;color:var(--fg-3);border:1px solid var(--line);border-radius:6px;
+            width:34px;height:34px;cursor:pointer}
+  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.9rem}
+  .key{background:var(--bg-2);border:1px solid var(--line);color:var(--fg-0);border-radius:10px;
+       padding:.75rem 0;font-size:1.3rem;font-weight:600;cursor:pointer;user-select:none}
+  .key small{display:block;font-family:var(--mono);font-size:.55rem;color:var(--fg-3);letter-spacing:.1em}
+  .key:active{background:var(--bg-1)}
+  .callrow{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+  .callrow .btn{margin:0}
+  .muted-tag{opacity:.6}
+  .log{background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:.6rem .7rem;
+       max-height:150px;overflow-y:auto;font-family:var(--mono);font-size:.72rem;color:var(--fg-2);
+       white-space:pre-wrap;line-height:1.5}
+  .logtitle{cursor:pointer;color:var(--fg-3);font-family:var(--mono);font-size:.7rem;text-transform:uppercase;
+            letter-spacing:.06em;margin-bottom:.4rem}
+  #ring-modal{display:none;position:fixed;inset:0;background:rgba(10,13,18,.82);z-index:999;
+              align-items:center;justify-content:center}
+  #ring-modal .box{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:1.6rem 1.8rem;
+                    max-width:360px;text-align:center;box-shadow:0 18px 64px rgba(0,0,0,.6)}
+  #ring-modal .eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;
+                        color:var(--accent);margin-bottom:.4rem}
+  #ring-from{font-size:1.2rem;font-weight:600;margin:.3rem 0 1.2rem;word-break:break-all}
+  .ringbtns{display:flex;gap:.7rem;justify-content:center}
+  .ringbtns button{border:0;border-radius:8px;padding:.8rem 1.3rem;font-weight:700;cursor:pointer;min-width:6rem}
+  #ring-accept{background:var(--ok);color:#06210f}
+  #ring-decline{background:var(--err);color:#2a0000}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span>Softphone</span> JsSIP</h1>
+  <p class="sub">Llamadas entrantes y salientes con audio bidireccional</p>
+
+  <div class="card" id="login-card">
+    <label>Nombre a mostrar</label>
+    <input id="displayname" type="text" placeholder="Jeff" autocomplete="off">
+    <label>URI SIP (usuario@dominio)</label>
+    <input id="uri" type="text" placeholder="sip:1000@midominio.com" autocomplete="off">
+    <div class="row2">
+      <div>
+        <label>Usuario (auth)</label>
+        <input id="authuser" type="text" placeholder="1000" autocomplete="off">
+      </div>
+      <div>
+        <label>Contraseña</label>
+        <input id="pass" type="password" autocomplete="off">
+      </div>
+    </div>
+    <label>Servidor WebSocket</label>
+    <input id="server" type="text" placeholder="wss://sip.midominio.com:8089/ws" autocomplete="off">
+    <button class="btn" id="connect" type="button">Conectar y registrar</button>
+    <button class="btn ghost" id="disconnect" type="button" disabled style="display:none">Desconectar</button>
+    <div class="status"><span class="dot idle" id="dot"></span><span id="statustext">Sin conectar</span></div>
+  </div>
+
+  <div class="card" id="phone-card">
+    <div class="status"><span class="dot registered" id="dot2"></span><span id="statustext2">Registrado</span>
+      <button class="btn ghost" id="disconnect2" type="button" style="width:auto;margin:0 0 0 auto;padding:.3rem .7rem;font-size:.75rem">Salir</button>
+    </div>
+    <div class="screen" style="margin-top:.9rem">
+      <input id="target" type="text" placeholder="Número o sip:usuario@dominio" autocomplete="off">
+      <button class="clearbtn" id="clear" type="button">⌫</button>
+    </div>
+    <div class="keypad" id="keypad">
+      <div class="key" data-d="1">1</div>
+      <div class="key" data-d="2">2<small>ABC</small></div>
+      <div class="key" data-d="3">3<small>DEF</small></div>
+      <div class="key" data-d="4">4<small>GHI</small></div>
+      <div class="key" data-d="5">5<small>JKL</small></div>
+      <div class="key" data-d="6">6<small>MNO</small></div>
+      <div class="key" data-d="7">7<small>PQRS</small></div>
+      <div class="key" data-d="8">8<small>TUV</small></div>
+      <div class="key" data-d="9">9<small>WXYZ</small></div>
+      <div class="key" data-d="*">*</div>
+      <div class="key" data-d="0">0<small>+</small></div>
+      <div class="key" data-d="#">#</div>
+    </div>
+    <div class="callrow">
+      <button class="btn" id="call" type="button">Llamar</button>
+      <button class="btn danger" id="hangup" type="button" disabled>Colgar</button>
+    </div>
+    <button class="btn ghost" id="mute" type="button" style="margin-top:.6rem" disabled>Silenciar mic</button>
+    <div class="logtitle" id="logtoggle">▸ Registro de eventos</div>
+    <div class="log" id="log" style="display:none"></div>
+  </div>
+
+  <audio id="remote-audio" autoplay playsinline></audio>
+</div>
+
+<div id="ring-modal">
+  <div class="box">
+    <div class="eyebrow">Llamada entrante</div>
+    <div id="ring-from">—</div>
+    <div class="ringbtns">
+      <button id="ring-accept" type="button">Contestar</button>
+      <button id="ring-decline" type="button">Rechazar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var ui = {
+    loginCard: document.getElementById('login-card'),
+    phoneCard: document.getElementById('phone-card'),
+    displayname: document.getElementById('displayname'),
+    uri: document.getElementById('uri'),
+    authuser: document.getElementById('authuser'),
+    pass: document.getElementById('pass'),
+    server: document.getElementById('server'),
+    connect: document.getElementById('connect'),
+    disconnect: document.getElementById('disconnect'),
+    disconnect2: document.getElementById('disconnect2'),
+    dot: document.getElementById('dot'),
+    dot2: document.getElementById('dot2'),
+    statustext: document.getElementById('statustext'),
+    statustext2: document.getElementById('statustext2'),
+    target: document.getElementById('target'),
+    clear: document.getElementById('clear'),
+    call: document.getElementById('call'),
+    hangup: document.getElementById('hangup'),
+    mute: document.getElementById('mute'),
+    remote: document.getElementById('remote-audio'),
+    log: document.getElementById('log'),
+    logtoggle: document.getElementById('logtoggle'),
+    ringModal: document.getElementById('ring-modal'),
+    ringFrom: document.getElementById('ring-from'),
+    ringAccept: document.getElementById('ring-accept'),
+    ringDecline: document.getElementById('ring-decline')
+  };
+
+  var ua = null;
+  var currentSession = null;
+  var isMuted = false;
+
+  // ---------- Persistencia local de credenciales (solo en este navegador) ----------
+  function loadCreds() {
+    try {
+      var c = JSON.parse(localStorage.getItem('softphone_creds') || '{}');
+      ui.displayname.value = c.displayname || '';
+      ui.uri.value = c.uri || '';
+      ui.authuser.value = c.authuser || '';
+      ui.server.value = c.server || '';
+    } catch (e) {}
+  }
+  function saveCreds() {
+    try {
+      localStorage.setItem('softphone_creds', JSON.stringify({
+        displayname: ui.displayname.value.trim(),
+        uri: ui.uri.value.trim(),
+        authuser: ui.authuser.value.trim(),
+        server: ui.server.value.trim()
+      }));
+    } catch (e) {}
+  }
+  loadCreds();
+
+  // ---------- Log ----------
+  function log(msg) {
+    var t = new Date().toLocaleTimeString();
+    ui.log.textContent += '[' + t + '] ' + msg + '\n';
+    ui.log.scrollTop = ui.log.scrollHeight;
+  }
+  ui.logtoggle.addEventListener('click', function () {
+    var show = ui.log.style.display === 'none';
+    ui.log.style.display = show ? 'block' : 'none';
+    ui.logtoggle.textContent = (show ? '▾' : '▸') + ' Registro de eventos';
+  });
+
+  // ---------- Estado visual ----------
+  function setStatus(state, text) {
+    [ui.dot, ui.dot2].forEach(function (d) { d.className = 'dot ' + state; });
+    ui.statustext.textContent = text;
+    ui.statustext2.textContent = text;
+  }
+
+  function showPhoneUI(show) {
+    ui.loginCard.style.display = show ? 'none' : 'block';
+    ui.phoneCard.style.display = show ? 'block' : 'none';
+  }
+
+  // ---------- Anillo entrante (modal + tono) ----------
+  var ringAudioCtx = null, ringInterval = null;
+  function startRingTone() {
+    try {
+      ringAudioCtx = ringAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      function beep() {
+        var o = ringAudioCtx.createOscillator();
+        var g = ringAudioCtx.createGain();
+        o.frequency.value = 440;
+        o.connect(g); g.connect(ringAudioCtx.destination);
+        g.gain.setValueAtTime(0.0001, ringAudioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.15, ringAudioCtx.currentTime + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ringAudioCtx.currentTime + 0.9);
+        o.start(); o.stop(ringAudioCtx.currentTime + 0.95);
+      }
+      beep();
+      ringInterval = setInterval(beep, 2000);
+    } catch (e) {}
+  }
+  function stopRingTone() {
+    if (ringInterval) { clearInterval(ringInterval); ringInterval = null; }
+  }
+
+  function showInboundRing(label, onAccept, onDecline) {
+    ui.ringFrom.textContent = label;
+    ui.ringModal.style.display = 'flex';
+    startRingTone();
+    function cleanup() {
+      ui.ringModal.style.display = 'none';
+      stopRingTone();
+      ui.ringAccept.removeEventListener('click', acceptHandler);
+      ui.ringDecline.removeEventListener('click', declineHandler);
+    }
+    function acceptHandler() { cleanup(); onAccept(); }
+    function declineHandler() { cleanup(); onDecline(); }
+    ui.ringAccept.addEventListener('click', acceptHandler);
+    ui.ringDecline.addEventListener('click', declineHandler);
+    return { dismiss: cleanup };
+  }
+  var currentRing = null;
+
+  // ---------- Conectar / registrar ----------
+  ui.connect.addEventListener('click', function () {
+    if (typeof JsSIP === 'undefined') {
+      setStatus('failed', 'No se pudo cargar la librería JsSIP.');
+      return;
+    }
+    if (!ui.server.value || !ui.uri.value) {
+      setStatus('failed', 'Completa al menos servidor y URI SIP.');
+      return;
+    }
+    saveCreds();
+    setStatus('connecting', 'Conectando a ' + ui.server.value + ' ...');
+    log('Creando UA para ' + ui.uri.value);
+
+    try {
+      var socket = new JsSIP.WebSocketInterface(ui.server.value.trim());
+      ua = new JsSIP.UA({
+        sockets: [socket],
+        uri: ui.uri.value.trim(),
+        display_name: ui.displayname.value.trim() || undefined,
+        authorization_user: ui.authuser.value.trim() || undefined,
+        password: ui.pass.value,
+        register: true,
+        session_timers: true
+      });
+
+      ua.on('connecting', function () { log('WS conectando...'); });
+      ua.on('connected', function () { log('WS conectado.'); });
+      ua.on('disconnected', function (e) {
+        setStatus('failed', 'WS desconectado');
+        log('WS desconectado: ' + (e && e.reason || 'desconocido'));
+      });
+      ua.on('registered', function () {
+        setStatus('registered', 'Registrado como ' + ui.uri.value);
+        log('REGISTRO OK — listo para llamar.');
+        showPhoneUI(true);
+        ui.call.disabled = false;
+      });
+      ua.on('unregistered', function () {
+        setStatus('idle', 'Sin registrar');
+        log('Sin registrar.');
+      });
+      ua.on('registrationFailed', function (e) {
+        setStatus('failed', 'Registro fallido: ' + (e && e.cause || 'desconocido'));
+        log('REGISTRO FALLÓ: ' + (e && e.cause));
+      });
+
+      ua.on('newRTCSession', function (data) {
+        var session = data.session;
+        currentSession = session;
+        log('newRTCSession ' + data.originator + ' — ' + (session.remote_identity && session.remote_identity.uri));
+
+        if (data.originator === 'remote') {
+          var label = 'Desconocido';
+          try {
+            var ri = session.remote_identity;
+            if (ri) {
+              var dn = ri.display_name || '';
+              var u = ri.uri && ri.uri.user ? ri.uri.user : '';
+              label = dn && u ? (dn + ' <' + u + '>') : (dn || u || label);
+            }
+          } catch (e) {}
+          log('Llamada entrante de ' + label + ' — sonando.');
+          setStatus('calling', 'Llamando — entrante de ' + label);
+          currentRing = showInboundRing(label, function () {
+            currentRing = null;
+            log('Aceptada — contestando.');
+            session.answer({ mediaConstraints: { audio: true, video: false } });
+            setStatus('calling', 'En llamada (entrante)');
+          }, function () {
+            currentRing = null;
+            log('Rechazada.');
+            try { session.terminate({ status_code: 603, reason_phrase: 'Decline' }); } catch (e) {}
+            setStatus('registered', 'Llamada rechazada de ' + label);
+          });
+        } else {
+          setStatus('calling', 'Llamando...');
+        }
+
+        session.on('progress', function () { log('En progreso...'); });
+        session.on('accepted', function () {
+          setStatus('calling', 'En llamada');
+          log('Llamada aceptada.');
+          ui.hangup.disabled = false;
+          ui.call.disabled = true;
+          ui.mute.disabled = false;
+        });
+        session.on('ended', function () {
+          if (currentRing) { try { currentRing.dismiss(); } catch (e) {} currentRing = null; }
+          setStatus('registered', 'Registrado (llamada finalizada)');
+          log('Llamada finalizada.');
+          resetCallUI();
+        });
+        session.on('failed', function (e) {
+          if (currentRing) { try { currentRing.dismiss(); } catch (e2) {} currentRing = null; }
+          setStatus('registered', 'Llamada fallida: ' + (e && e.cause || '?'));
+          log('Llamada fallida: ' + (e && e.cause));
+          resetCallUI();
+        });
+
+        // Audio bidireccional: JsSIP ya captura el micrófono local vía
+        // mediaConstraints en call()/answer(); aquí solo conectamos el
+        // stream remoto entrante al elemento <audio> para reproducirlo.
+        // OJO: en llamadas entrantes session.connection aún no existe en este
+        // punto (se crea recién dentro de answer()), por eso nos suscribimos
+        // al evento "peerconnection", que se emite tanto en connect() como en
+        // answer() justo después de crear el RTCPeerConnection.
+        function attachRemoteTrack(pc) {
+          pc.addEventListener('track', function (ev) {
+            if (ev.track.kind === 'audio') {
+              ui.remote.srcObject = ev.streams[0];
+              log('Pista de audio remota conectada.');
+            }
+          });
+        }
+        if (session.connection) {
+          attachRemoteTrack(session.connection);
+        } else {
+          session.on('peerconnection', function (data) {
+            attachRemoteTrack(data.peerconnection);
+          });
+        }
+      });
+
+      ua.start();
+    } catch (err) {
+      setStatus('failed', 'Conexión fallida: ' + (err && err.message || err));
+      log('FALLO: ' + err);
+    }
+  });
+
+  function doDisconnect() {
+    if (currentSession) { try { currentSession.terminate(); } catch (e) {} }
+    if (ua) { try { ua.stop(); } catch (e) {} }
+    ua = null;
+    setStatus('idle', 'Desconectado.');
+    showPhoneUI(false);
+    log('Desconectado.');
+  }
+  ui.disconnect.addEventListener('click', doDisconnect);
+  ui.disconnect2.addEventListener('click', doDisconnect);
+
+  // ---------- Llamar / colgar ----------
+  ui.call.addEventListener('click', function () {
+    if (!ua) return;
+    var raw = ui.target.value.trim();
+    if (!raw) { log('Escribe un número o URI destino.'); return; }
+    var target = raw;
+    if (!/^sip:/i.test(target)) {
+      var m = ui.uri.value.match(/@([^>;]+)/);
+      var domain = m ? m[1] : '';
+      target = 'sip:' + raw.replace(/[^+\d]/g, '') + (domain ? '@' + domain : '');
+    }
+    log('Llamando a ' + target + '...');
+    setStatus('calling', 'Llamando a ' + target + '...');
+    try {
+      ua.call(target, { mediaConstraints: { audio: true, video: false } });
+    } catch (e) {
+      setStatus('registered', 'Llamada fallida.');
+      log('Llamada fallida: ' + e);
+    }
+  });
+
+  ui.hangup.addEventListener('click', function () {
+    if (currentSession) { try { currentSession.terminate(); } catch (e) {} }
+    resetCallUI();
+  });
+
+  function resetCallUI() {
+    ui.hangup.disabled = true;
+    ui.call.disabled = false;
+    ui.mute.disabled = true;
+    isMuted = false;
+    ui.mute.textContent = 'Silenciar mic';
+    currentSession = null;
+  }
+
+  ui.mute.addEventListener('click', function () {
+    if (!currentSession) return;
+    isMuted = !isMuted;
+    try {
+      if (isMuted) { currentSession.mute({ audio: true }); ui.mute.textContent = 'Activar mic'; log('Micrófono silenciado.'); }
+      else { currentSession.unmute({ audio: true }); ui.mute.textContent = 'Silenciar mic'; log('Micrófono activado.'); }
+    } catch (e) {}
+  });
+
+  // ---------- Teclado ----------
+  ui.clear.addEventListener('click', function () {
+    ui.target.value = ui.target.value.slice(0, -1);
+  });
+  document.querySelectorAll('.key').forEach(function (k) {
+    k.addEventListener('click', function () {
+      var d = k.getAttribute('data-d');
+      if (currentSession && ui.hangup.disabled === false) {
+        try { currentSession.sendDTMF(d); log('DTMF: ' + d); } catch (e) {}
+      } else {
+        ui.target.value += d;
+      }
+    });
+  });
+  ui.target.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ui.call.click(); }
+  });
+
+})();
+</script>
+</body>
+</html>

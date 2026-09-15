@@ -1,11 +1,9 @@
-
 services:
 
   web:
-    build: ./web
-    container_name: sip-web
+    build: .
+    container_name: sip-web-2
     ports:
-      - "8080:80"           # Interfaz web por HTTP (solo funciona en localhost)
-      - "8443:443"          # Interfaz web por HTTPS (necesaria desde otra red/PC)
+      - "8080:80"           # Interfaz web por HTTP (solo localhost)
+      - "8443:443"          # Interfaz web por HTTPS (necesaria desde otra red/PC, requerida por getUserMedia)
     restart: unless-stopped
-
